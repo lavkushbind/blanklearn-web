@@ -98,7 +98,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
 
         const options = {
             key: "rzp_live_6vd9RApruseTAi", // Aapki Key
-            amount: "100",
+            amount: "1000",
             currency: "INR",
             name: "Blanklearn",
             description: "Demo Class Booking",
@@ -154,7 +154,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                     <>
                         <DialogHeader>
                             <DialogTitle>Book Your Demo Session</DialogTitle>
-                            <DialogDescription>Fill details to schedule live demo for ₹1.</DialogDescription>
+                            <DialogDescription>Fill details to schedule live demo for ₹10.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div>
@@ -179,7 +179,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                         </div>
                         <DialogFooter>
                             <Button onClick={handlePayment} disabled={loading} className="w-full glowing-button">
-                                {loading ? 'Processing...' : 'Pay ₹1 & Book'}
+                                {loading ? 'Processing...' : 'Pay ₹10 & Book'}
                             </Button>
                         </DialogFooter>
                     </>
@@ -241,7 +241,7 @@ const NavigationBar = ({ onBookDemoClick }: { onBookDemoClick: () => void; }) =>
 
         <div className="flex items-center gap-2 md:gap-4">
           {/* ... Login Button code ... */}
-          <Button className="glowing-button" onClick={onBookDemoClick}>Book Demo @ ₹1</Button>
+          <Button className="glowing-button" onClick={onBookDemoClick}>Book Demo @ ₹10</Button>
         </div>
       </div>
     </header>
@@ -886,9 +886,11 @@ const Footer = ({ onBookDemoClick }: { onBookDemoClick: () => void }) => (
                 <span className="text-xl font-bold">Blanklearn</span>
             </div>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-4 sm:mt-0">
-                <a href="#" className="hover:text-white text-sm">Terms of Service</a>
-                <a href="#" className="hover:text-white text-sm">Privacy Policy</a>
-                <a href="#" className="hover:text-white text-sm">Contact Us</a>
+                <a href="policies" className="hover:text-white text-sm">Terms of Service</a>
+                <a href="policies" className="hover:text-white text-sm">Privacy Policy</a>
+                <a href="policies" className="hover:text-white text-sm">Contact Us</a>
+                    <a href="/policies" className="hover:text-white text-sm">Refund Policy</a> {/* Ye line add karein */}
+
             </div>
             <p className="mt-4 sm:mt-0 text-sm text-slate-500 text-center">&copy; {new Date().getFullYear()} Blanklearn. All rights reserved.</p>
         </div>
