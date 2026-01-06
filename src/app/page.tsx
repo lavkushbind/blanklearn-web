@@ -1,5 +1,9 @@
 'use client';
+import { ref, onValue, push, set } from "firebase/database";
 
+import { realtimeDb } from "@/lib/firebase"; 
+import { Quote } from 'lucide-react'; // Icon ke liye
+import ReactPixel from 'react-facebook-pixel'; // Top par add karein
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -32,6 +36,8 @@ import {
   Clock,
   AlertTriangle,
   Gift,
+  Loader2, // <--- YE ADD KAREIN
+  Play, 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import imageData from '@/lib/placeholder-images.json';
@@ -55,62 +61,80 @@ const loadScript = (src: string) => {
     document.body.appendChild(script);
   });
 };
-
 const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void; }) => {
     const { toast } = useToast();
     const [phone, setPhone] = useState('');
     const [className, setClassName] = useState('');
     const [loading, setLoading] = useState(false);
+    
+    // Ye naya state hai: Check karega ki booking ho gayi ya nahi
+    const [isSuccess, setIsSuccess] = useState(false);
+
+    // Jab modal close ho, to form reset kar do
+    useEffect(() => {
+        if (!open) {
+            setTimeout(() => {
+                setIsSuccess(false);
+                setPhone('');
+                setClassName('');
+            }, 300);
+        }
+    }, [open]);
 
     const handlePayment = async () => {
+        // Validation
         if (!phone || !className) {
-            toast({ title: 'Missing Details', description: 'Please fill out all the fields to book a demo.', variant: 'destructive' });
+            toast({ title: 'Details Missing', description: 'Please enter Number and Class.', variant: 'destructive' });
             return;
         }
 
-        if (phone.length < 10) {
-            toast({ title: 'Invalid Phone Number', description: 'Please enter a valid 10-digit phone number.', variant: 'destructive' });
-            return;
-        }
-        
         setLoading(true);
         
         const res = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
         if (!res) {
-            toast({ title: 'Error', description: 'Razorpay SDK failed to load. Are you online?', variant: 'destructive' });
             setLoading(false);
             return;
         }
 
         const options = {
-            key: "rzp_live_6vd9RApruseTAi",
-            amount: "100", // amount in the smallest currency unit (₹1)
+            key: "rzp_live_6vd9RApruseTAi", // Aapki Key
+            amount: "100",
             currency: "INR",
             name: "Blanklearn",
-            description: "Demo Session",
-            image: "https://i.imgur.com/8l63YxI.png",
+            description: "Demo Class Booking",
+            
+            // --- SUCCESS HANDLER ---
             handler: function (response: any) {
-                // Payment successful
                 setLoading(false);
-                toast({ title: 'Payment Successful!', description: 'Redirecting to WhatsApp...' });
-
-                const message = `*New Demo Booking!*%0A%0A*Class:* ${className}%0A*WhatsApp Number:* ${phone}%0A*Payment ID:* ${response.razorpay_payment_id}`;
-                const whatsappUrl = `https://wa.me/919235044520?text=${message}`;
                 
-                window.open(whatsappUrl, '_blank');
-                onOpenChange(false);
-            },
-            modal: {
-                ondismiss: function() {
-                    setLoading(false);
-                    toast({ title: 'Payment Cancelled', description: 'Your payment was not completed.', variant: 'destructive' });
+                // 1. Firebase Save Logic
+                try {
+                    const bookingsRef = ref(realtimeDb, 'DemoBookings');
+                    const newBookingRef = push(bookingsRef);
+                    set(newBookingRef, {
+                        mobileNumber: phone,
+                        studentClass: className,
+                        paymentId: response.razorpay_payment_id,
+                        timestamp: new Date().toLocaleString()
+                    });
+                } catch (error) {
+                    console.error("Database save failed", error);
                 }
+
+                // 2. WhatsApp HATA DIYA hai.
+                 import("react-facebook-pixel").then((x) => x.default).then((ReactPixel) => {
+        ReactPixel.track('Purchase', { 
+            value: 10.00, 
+            currency: 'INR',
+            content_name: 'Demo Class Booking'
+        });
+    });
+                // 3. Success Screen dikhana
+                setIsSuccess(true);
+                toast({ title: 'Booking Confirmed!', description: 'Please download the app.' });
             },
             prefill: {
                 contact: phone,
-            },
-            notes: {
-                class: className,
             },
             theme: {
                 color: "#3F51B5"
@@ -118,57 +142,105 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
         };
 
         const paymentObject = new window.Razorpay(options);
-        paymentObject.on('payment.failed', function (response:any) {
-            setLoading(false);
-            toast({
-                title: "Payment Failed",
-                description: `Error: ${response.error.description}`,
-                variant: "destructive",
-            });
-        });
         paymentObject.open();
     }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Book Your Demo Session</DialogTitle>
-                    <DialogDescription>Fill in the details to schedule your child's live demo for just ₹1.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                     <div>
-                        <Label htmlFor="phone">Your WhatsApp Number</Label>
-                        <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter your 10-digit number" />
+            <DialogContent className="sm:max-w-md">
+                
+                {/* LOGIC: Agar Success nahi hua to Form dikhao, nahi to App Download dikhao */}
+                {!isSuccess ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>Book Your Demo Session</DialogTitle>
+                            <DialogDescription>Fill details to schedule live demo for ₹1.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label htmlFor="phone">Your WhatsApp Number</Label>
+                                <Input 
+                                    id="phone" 
+                                    type="tel" 
+                                    value={phone} 
+                                    onChange={(e) => setPhone(e.target.value)} 
+                                    placeholder="Enter 10-digit number" 
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="class">Class / Grade</Label>
+                                <Input 
+                                    id="class" 
+                                    value={className} 
+                                    onChange={(e) => setClassName(e.target.value)} 
+                                    placeholder="e.g., Class 5" 
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={handlePayment} disabled={loading} className="w-full glowing-button">
+                                {loading ? 'Processing...' : 'Pay ₹1 & Book'}
+                            </Button>
+                        </DialogFooter>
+                    </>
+                ) : (
+                    // --- SUCCESS SCREEN (App Download) ---
+                    <div className="flex flex-col items-center justify-center text-center py-6 space-y-4 animate-in fade-in zoom-in duration-300">
+                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                            <CheckCircle className="w-10 h-10 text-green-600" />
+                        </div>
+                        
+                        <DialogTitle className="text-2xl font-bold text-green-700">Booking Confirmed!</DialogTitle>
+                        
+                        <p className="text-slate-600">
+                            Thank you! To join your class, please download the <span className="font-bold text-slate-900">Blanklearn App</span> now.
+                        </p>
+                        
+                        <div className="w-full pt-4">
+                            <Button 
+                                className="w-full h-14 text-lg bg-black hover:bg-slate-800 text-white gap-2 shadow-xl"
+                                onClick={() => window.open('https://play.google.com/store/apps/details?id=com.blank_learn.dark', '_blank')}
+                            >
+                                <PlayCircle className="fill-current" />
+                                Download Android App
+                            </Button>
+                        </div>
+                        
+                        <p className="text-xs text-slate-400 mt-4">
+                            Your class details will be visible inside the app.
+                        </p>
                     </div>
-                    <div>
-                        <Label htmlFor="class">Class</Label>
-                        <Input id="class" value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g., Class 6" />
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button onClick={handlePayment} disabled={loading} className="w-full glowing-button">
-                        {loading ? 'Processing...' : 'Pay ₹1 & Book'}
-                    </Button>
-                </DialogFooter>
+                )}
+
             </DialogContent>
         </Dialog>
     );
 };
 
 // Section 1: Navigation Bar
+// Section 1: Navigation Bar
 const NavigationBar = ({ onBookDemoClick }: { onBookDemoClick: () => void; }) => {
   return (
     <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        
+        {/* LOGO WALA HISSA */}
         <div className="flex items-center gap-2">
-           <svg width="40" height="40" viewBox="0 0 250 250" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M125 0C55.9644 0 0 55.9644 0 125C0 194.036 55.9644 250 125 250C194.036 250 250 194.036 250 125C250 55.9644 194.036 0 125 0ZM197.668 90.5651L124.735 163.743C124.64 163.838 124.526 163.914 124.401 163.965C124.276 164.017 124.14 164.043 124.002 164.043C123.864 164.043 123.727 164.017 123.602 163.965C123.477 163.914 123.363 163.838 123.268 163.743L50.3346 90.5651C49.9531 90.1835 49.7466 89.6643 49.757 89.1245C49.7675 88.5847 49.9943 88.074 50.3887 87.6974C50.783 87.3208 51.3093 87.108 51.8654 87.1009C52.4215 87.0938 52.9556 87.3028 53.3599 87.6974L124.002 158.577L194.643 87.6974C195.047 87.3028 195.581 87.0938 196.137 87.1009C196.693 87.108 197.219 87.3208 197.614 87.6974C198.008 88.074 198.235 88.5847 198.245 89.1245C198.256 89.6643 198.049 90.1835 197.668 90.5651Z" fill="#3F51B5"/>
-          </svg>
+           
+           {/* Purana SVG hata diya, ab ye Image tag lagayein */}
+           <Image 
+             src="/logo.jpg" 
+             alt="Blanklearn Logo" 
+             width={40} 
+             height={40} 
+             className="rounded-full object-cover" // Thoda gol (round) dikhne ke liye
+           />
+
           <span className="text-2xl font-bold text-primary">Blanklearn</span>
         </div>
+
         <div className="flex items-center gap-2 md:gap-4">
-          <Button variant="ghost">Login</Button>
+          {/* ... Login Button code ... */}
           <Button className="glowing-button" onClick={onBookDemoClick}>Book Demo @ ₹1</Button>
         </div>
       </div>
@@ -189,35 +261,36 @@ const HeroHeader = ({ onBookDemoClick }: { onBookDemoClick: () => void }) => (
             Your Child’s After-School Studies, Fully Managed While You Work.
           </h1>
           <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-xl mx-auto lg:mx-0">
-            Interactive Live Classes in Small Groups (Max 8 Students). Homework help, concept clearing, and skill building—all inside one app.
+            Interactive Live Classes in Small Groups (Max 5 Students). Homework help, concept clearing, and skill building—all inside one app.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
             <Button size="lg" className="w-full sm:w-auto glowing-button text-lg h-14 px-8" onClick={onBookDemoClick}>
-              Book 1-Hour Live Demo for ₹1
+              Book 1-Hour Live Demo for ₹10
             </Button>
           </div>
           <p className="mt-4 text-sm text-slate-500 font-semibold">
-            Trusted by 500+ Working Parents | No Hidden Charges
+            Trusted by 2000+ Working Parents | No Hidden Charges
           </p>
         </div>
         <div className="grid grid-cols-2 gap-4">
-            <Image
-                src={imageData.heroStudent.src}
-                alt="Child learning on tablet"
-                width={imageData.heroStudent.width}
-                height={imageData.heroStudent.height}
-                className="rounded-2xl shadow-xl transform rotate-[-3deg] hover:rotate-0 hover:scale-105 transition-transform duration-300"
-                data-ai-hint={imageData.heroStudent.aiHint}
-            />
-            <Image
-                src={imageData.heroParent.src}
-                alt="Parent working on laptop"
-                width={imageData.heroParent.width}
-                height={imageData.heroParent.height}
-                className="rounded-2xl shadow-xl transform rotate-[3deg] hover:rotate-0 hover:scale-105 transition-transform duration-300 mt-8"
-                data-ai-hint={imageData.heroParent.aiHint}
-            />
-        </div>
+    {/* Pehli Image: Bachha (img2) */}
+    <Image
+        src="/img2.png"
+        alt="Child learning on tablet"
+        width={500}
+        height={400}
+        className="rounded-2xl shadow-xl transform rotate-[-3deg] hover:rotate-0 hover:scale-105 transition-transform duration-300"
+    />
+    
+    {/* Dusri Image: Parent (img1) */}
+    <Image
+        src="/img1.png"
+        alt="Parent working on laptop"
+        width={500}
+        height={400}
+        className="rounded-2xl shadow-xl transform rotate-[3deg] hover:rotate-0 hover:scale-105 transition-transform duration-300 mt-8"
+    />
+</div>
       </div>
     </div>
   </section>
@@ -274,7 +347,7 @@ const PainAndSolution = () => (
 const features = [
   {
     icon: <Users className="w-8 h-8 md:w-10 md:h-10 text-primary" />,
-    title: "1:8 Interaction Ratio",
+    title: "1:5 Interaction Ratio",
     description: "Every child's camera is on. Every child speaks. Every child is heard. No one is left behind.",
   },
   {
@@ -321,7 +394,7 @@ const DemoBreakdown = () => (
     <section className="py-20 md:py-28 bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 md:mb-16">
-          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">Experience the Magic for just ₹1.</h2>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">Experience the Magic for just ₹10.</h2>
           <p className="mt-4 text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
             Completely transparent. See if we're the right fit for your child.
           </p>
@@ -331,7 +404,7 @@ const DemoBreakdown = () => (
           <div className="grid md:grid-cols-4 gap-x-8 gap-y-12">
             <div className="flex flex-col items-center text-center">
               <div className="w-16 h-16 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-2xl font-bold mb-4 border-4 border-white shadow-md z-10">1</div>
-              <h3 className="font-bold text-lg md:text-xl">Pay ₹1</h3>
+              <h3 className="font-bold text-lg md:text-xl">Pay ₹10</h3>
               <p className="text-slate-600 mt-2 text-sm md:text-base">A nominal fee to ensure a focused, small-group environment for committed learners.</p>
             </div>
             <div className="flex flex-col items-center text-center">
@@ -378,92 +451,285 @@ const mentors = [
   }
 ];
 
-const MeetTheMentors = () => (
-  <section className="py-20 md:py-28 bg-slate-50">
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-12 md:mb-16">
-        <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">Taught by Experts, Not Just Tutors.</h2>
-         <p className="mt-4 text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
-          Our mentors are certified educators passionate about helping children succeed.
-        </p>
-      </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        {mentors.map((mentor, index) => (
-          <Card key={index} className="overflow-hidden text-center rounded-2xl shadow-lg group transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-            <div className="relative">
-              <Image
-                src={mentor.image.src}
-                alt={mentor.name}
-                width={mentor.image.width}
-                height={mentor.image.height}
-                className="w-full h-80 object-cover object-top"
-                data-ai-hint={mentor.image.aiHint}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-center p-4">
-                 <PlayCircle className="w-16 h-16 md:w-20 md:h-20 text-white/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform group-hover:scale-110" />
-              </div>
-            </div>
-            <CardContent className="p-6 bg-white">
-              <h3 className="text-xl md:text-2xl font-bold text-slate-900">{mentor.name}</h3>
-              <p className="text-primary font-semibold mt-1 text-sm md:text-base">{mentor.experience}</p>
-              <p className="text-slate-600 mt-2 text-sm md:text-base">{mentor.expertise}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  </section>
-);
+// Imports check kar lein (top of file):
+// import { ref, onValue } from "firebase/database";
+// import { realtimeDb } from "@/lib/firebase";
+// import { Play, Pause, Loader2 } from "lucide-react"; // Icons chahiye honge
 
-// Section 7: Social Proof
-const SocialProof = () => (
-  <section className="py-20 md:py-28 bg-white">
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-12 md:mb-16">
-        <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">What Other Busy Parents Say.</h2>
-         <p className="mt-4 text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
-          Real stories from parents who've reclaimed their evenings.
-        </p>
-      </div>
+const StudentHighlights = () => {
+  const [videos, setVideos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Kaunsa video play ho raha hai, uska ID track karne ke liye
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  
+  // Saare videos ko control karne ke liye Refs
+  const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
 
-      <div className="grid lg:grid-cols-2 gap-12 items-start">
-        <div>
-          <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-6 text-center lg:text-left">Video Testimonials</h3>
-          <div className="space-y-6">
-            {[imageData.testimonialParent1, imageData.testimonialParent2, imageData.testimonialParent3].map((testimonial, index) => (
-               <div key={index} className="relative rounded-2xl overflow-hidden shadow-lg group">
-                  <Image src={testimonial.src} alt={`Testimonial ${index + 1}`} width={testimonial.width} height={testimonial.height} data-ai-hint={testimonial.aiHint} className="w-full" />
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <PlayCircle className="w-12 h-12 md:w-16 md:h-16 text-white/80" />
+  useEffect(() => {
+    const videosRef = ref(realtimeDb, 'VideoUploads');
+
+    const unsubscribe = onValue(videosRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const videoList = Object.entries(data).map(([key, value]: [string, any]) => ({
+          id: key,
+          url: value.videoUrl || value.postUrl || value.url,
+          // Agar thumbnail hai to use karein, nahi to blank
+          thumbnail: value.thumbnail || value.image || "", 
+        }));
+        setVideos(videoList);
+      } else {
+        setVideos([]);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Function: Jab user kisi video par click kare
+  const handlePlay = (id: string) => {
+    // 1. Agar koi aur video chal raha hai, to usse pause karo
+    Object.keys(videoRefs.current).forEach((key) => {
+      if (key !== id && videoRefs.current[key]) {
+        videoRefs.current[key]?.pause();
+      }
+    });
+
+    // 2. Current video ko play karo
+    if (videoRefs.current[id]) {
+      videoRefs.current[id]?.play();
+    }
+    
+    // 3. State set karo
+    setPlayingId(id);
+  };
+
+  // Function: Jab video pause ho jaye
+  const handlePause = (id: string) => {
+    if (playingId === id) {
+      setPlayingId(null);
+    }
+  };
+
+  return (
+    <section className="py-20 md:py-28 bg-slate-50">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Heading */}
+        <div className="text-center mb-12 md:mb-16">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">Meet the educators behind the learning</h2>
+          <p className="mt-4 text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
+Passionate teachers who explain with patience, care deeply about every student, and focus on real understanding — not pressure</p>
+        </div>
+
+        {/* Video Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center h-40">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="ml-2 text-slate-500">Loading Highlights...</span>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {videos.length > 0 ? (
+              videos.map((video) => (
+                <div 
+                  key={video.id} 
+                  className={`relative group rounded-2xl overflow-hidden bg-black shadow-lg border border-slate-200 transition-all duration-300 ${playingId === video.id ? 'ring-2 ring-primary shadow-2xl scale-[1.02]' : 'hover:shadow-xl'}`}
+                  style={{ aspectRatio: '16/9' }} // Fixed Aspect Ratio
+                >
+                  
+                  {/* Video Player */}
+                  <video
+                    ref={(el) => { videoRefs.current[video.id] = el; }}
+                    className="w-full h-full object-cover"
+                    src={video.url}
+                    controls={playingId === video.id} // Controls tabhi dikhenge jab play hoga
+                    controlsList="nodownload noremoteplayback" // Extra options hide karna
+                    playsInline
+                    poster={video.thumbnail} // Agar thumbnail hai
+                    onPlay={() => setPlayingId(video.id)} // Native play click handle
+                    onPause={() => handlePause(video.id)}
+                    onEnded={() => setPlayingId(null)}
+                  />
+
+                  {/* Custom Play Button Overlay (Sirf tab dikhega jab video PAUSED ho) */}
+                  {playingId !== video.id && (
+                    <div 
+                      className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors flex items-center justify-center cursor-pointer"
+                      onClick={() => handlePlay(video.id)}
+                    >
+                      {/* Play Button Circle */}
+                      <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/40 shadow-xl group-hover:scale-110 transition-transform duration-300">
+                         <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-inner">
+                            <Play className="w-5 h-5 text-primary ml-1 fill-current" />
+                         </div>
+                      </div>
+                      
+                      {/* Optional: Title or Tag overlay */}
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <p className="text-white text-sm font-medium opacity-90 truncate drop-shadow-md">
+                          Click to watch class snippet
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              ))
+            ) : (
+              <p className="text-center col-span-full text-slate-500">No videos available right now.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+// Imports check kar lein (top of file):
+// import { Star, Quote } from 'lucide-react';
+// import { ref, onValue } from "firebase/database";
+// import { realtimeDb } from "@/lib/firebase";
+
+const SocialProof = () => {
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const reviewsRef = ref(realtimeDb, 'reviews');
+
+    const unsubscribe = onValue(reviewsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedReviews = Object.entries(data).map(([key, value]: [string, any]) => ({
+          id: key,
+          // IMPORTANT: Yahan maine aapke database fields ke hisaab se naam change kiye hain
+          name: value.name || "Parent",
+          attribution: value.attribution || "",
+          imageUrl: value.imageUrl || "", // Profile Image
+          rating: value.rating || 5,      // Rating (Default 5)
+          reviewText: value.reviewText || value.text || "No review text provided.", // Review Text
+          tag: value.statusTag || ""      // Tag like "Students class 4"
+        }));
+        setReviews(loadedReviews);
+      } else {
+        setReviews([]);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Helper function stars dikhane ke liye
+  const renderStars = (count: number) => {
+    return Array(5).fill(0).map((_, i) => (
+      <Star key={i} className={`w-4 h-4 ${i < count ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`} />
+    ));
+  };
+
+  return (
+    <section className="py-20 md:py-28 bg-white">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Header Section */}
+        <div className="text-center mb-12 md:mb-16">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">What Other Busy Parents Say.</h2>
+          <p className="mt-4 text-base md:text-lg text-slate-600 max-w-2xl mx-auto">
+            Real stories from parents who've reclaimed their evenings.
+          </p>
+        </div>
+
+        {/* Reviews Grid (Video Section REMOVED) */}
+        {loading ? (
+          <div className="text-center py-10">
+            <p className="text-lg text-slate-500">Loading reviews...</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {reviews.length > 0 ? (
+              reviews.map((review) => (
+                <div key={review.id} className="bg-slate-50 rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-1">
+                  
+                  {/* Top: Profile Info */}
+                  <div className="flex items-center gap-4 mb-4">
+                    {/* Profile Image */}
+                    <div className="relative w-14 h-14 flex-shrink-0">
+                      {review.imageUrl ? (
+                        <img 
+                          src={review.imageUrl} 
+                          alt={review.name} 
+                          className="w-full h-full rounded-full object-cover border-2 border-white shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
+                          {review.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Name & Tag */}
+                    <div>
+                      <h4 className="font-bold text-slate-900 leading-tight">{review.name}</h4>
+                      {review.tag && (
+                        <span className="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full mt-1 font-medium">
+                          {review.tag}
+                        </span>
+                      )}
+                    </div>
                   </div>
-               </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-6 text-center lg:text-left">Real Parent Feedback</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {[imageData.whatsappChat1, imageData.whatsappChat2, imageData.whatsappChat3].map((chat, index) => (
-                <Image key={index} src={chat.src} alt={`WhatsApp Chat ${index+1}`} width={chat.width} height={chat.height} data-ai-hint={chat.aiHint} className="rounded-xl shadow-md w-full transition-transform hover:scale-105" />
-              ))}
-          </div>
-          <div className="mt-8 bg-slate-50 rounded-2xl p-6 md:p-8 text-center shadow-inner">
-            <div className="flex justify-center items-center gap-1 text-yellow-400">
-                <Star className="w-6 h-6 md:w-8 md:h-8 fill-current" />
-                <Star className="w-6 h-6 md:w-8 md:h-8 fill-current" />
-                <Star className="w-6 h-6 md:w-8 md:h-8 fill-current" />
-                <Star className="w-6 h-6 md:w-8 md:h-8 fill-current" />
-                <Star className="w-6 h-6 md:w-8 md:h-8 fill-current" />
-            </div>
-            <p className="text-xl md:text-2xl font-bold text-slate-900 mt-2">4.9 / 5.0</p>
-            <p className="text-slate-600 text-sm md:text-base">Based on App Store & Play Store Reviews</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-);
 
+                  {/* Rating Stars */}
+                  <div className="flex gap-1 mb-3">
+                    {renderStars(review.rating)}
+                  </div>
+
+                  {/* Review Text */}
+                  <div className="relative">
+                    <Quote className="w-8 h-8 text-slate-200 absolute -top-2 -left-2 -z-10" />
+                    <p className="text-slate-700 text-sm md:text-base leading-relaxed">
+                      "{review.reviewText}"
+                    </p>
+                  </div>
+
+                  {/* Bottom Attribution (e.g. Father of...) */}
+                  {review.attribution && (
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <p className="text-xs text-slate-500 font-medium text-right">
+                        {review.attribution}
+                      </p>
+                    </div>
+                  )}
+
+                </div>
+              ))
+            ) : (
+              <p className="text-center col-span-full text-slate-500">No reviews found.</p>
+            )}
+          </div>
+        )}
+
+        {/* Overall Rating Footer */}
+        <div className="mt-12 text-center">
+            <div className="inline-flex items-center gap-2 bg-slate-50 px-6 py-3 rounded-full border border-slate-200">
+                <div className="flex text-yellow-400 gap-1">
+                    <Star className="w-5 h-5 fill-current" />
+                    <Star className="w-5 h-5 fill-current" />
+                    <Star className="w-5 h-5 fill-current" />
+                    <Star className="w-5 h-5 fill-current" />
+                    <Star className="w-5 h-5 fill-current" />
+                </div>
+                <span className="font-bold text-slate-900">4.9/5.0</span>
+                <span className="text-slate-500 text-sm">from happy parents</span>
+            </div>
+        </div>
+
+      </div>
+    </section>
+  );
+};
 
 // Section 8: The Pricing Plan
 const PricingPlan = () => (
@@ -535,12 +801,33 @@ const PricingPlan = () => (
 // Section 9: The Final FAQ
 const faqItems = [
     {
-        question: "What if my child misses a class?",
-        answer: "No problem! All sessions are recorded and available on the app instantly. Your child can catch up anytime, anywhere."
+        question: "Is the class Live or Recorded?",
+        answer: "It is 100% Live and Face-to-Face. Unlike recorded videos, your child can speak, ask doubts, and interact with the teacher in real-time. It's a two-way conversation, just like sitting in a physical classroom."
     },
     {
-        question: "Can I change the teacher or batch?",
-        answer: "Yes, absolutely. We want the perfect fit for your child. You can request a batch or teacher change directly through the app."
+        question: "Will classes happen daily?",
+        answer: "Classes are conducted 5-6 days a week. However, we are flexible! We create the schedule according to your child's availability and school timings."
+    },
+     // 3. Fee Structure (Aapka Point)
+    {
+        question: "What is the fee structure?",
+        answer: "We have two transparent plans: ₹2,000/month for Small Groups (1:5 ratio) and ₹4,000/month for 1-on-1 Private Tuition. The Demo class booking fee is just ₹10."
+    },
+    // 4. Syllabus (Extra Important)
+    {
+        question: "Do you cover the school syllabus?",
+        answer: "Yes, absolutely. We map our teaching directly to your child's school textbook (CBSE, ICSE, or State Board). Our goal is to help them score higher marks in their school exams."
+    },
+    
+    // 6. Teacher Quality (Extra Important)
+    {
+        question: "Who are the teachers?",
+        answer: "We don't hire just anyone. Our mentors are top 1% educators selected after a rigorous 4-step interview process. They are trained specifically to keep children engaged online."
+    },
+    // 7. Device Requirement (Extra Important)
+    {
+        question: "Do I need a laptop for this?",
+        answer: "No, a laptop is not mandatory. Our App works perfectly on any Android mobile or Tablet. A stable internet connection is all you need."
     },
     {
         question: "Is my payment secure?",
@@ -582,16 +869,20 @@ const Footer = ({ onBookDemoClick }: { onBookDemoClick: () => void }) => (
         <h2 className="text-3xl md:text-4xl font-bold text-white">Don't let another evening go to waste.</h2>
         <div className="mt-8">
             <Button size="lg" className="glowing-button h-14 px-8 md:px-10 text-lg" onClick={onBookDemoClick}>
-                Book Your ₹1 Demo Session Now
+                Book Your ₹10 Demo Session Now
             </Button>
         </div>
     </div>
     <div className="border-t border-slate-700">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
-               <svg width="32" height="32" viewBox="0 0 250 250" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M125 0C55.9644 0 0 55.9644 0 125C0 194.036 55.9644 250 125 250C194.036 250 250 194.036 250 125C250 55.9644 194.036 0 125 0ZM197.668 90.5651L124.735 163.743C124.64 163.838 124.526 163.914 124.401 163.965C124.276 164.017 124.14 164.043 124.002 164.043C123.864 164.043 123.727 164.017 123.602 163.965C123.477 163.914 123.363 163.838 123.268 163.743L50.3346 90.5651C49.9531 90.1835 49.7466 89.6643 49.757 89.1245C49.7675 88.5847 49.9943 88.074 50.3887 87.6974C50.783 87.3208 51.3093 87.108 51.8654 87.1009C52.4215 87.0938 52.9556 87.3028 53.3599 87.6974L124.002 158.577L194.643 87.6974C195.047 87.3028 195.581 87.0938 196.137 87.1009C196.693 87.108 197.219 87.3208 197.614 87.6974C198.008 88.074 198.235 88.5847 198.245 89.1245C198.256 89.6643 198.049 90.1835 197.668 90.5651Z" fill="#3F51B5"/>
-                </svg>
+              <Image 
+             src="/logo.jpg" 
+             alt="Blanklearn Logo" 
+             width={40} 
+             height={40} 
+             className="rounded-full object-cover" // Thoda gol (round) dikhne ke liye
+           />
                 <span className="text-xl font-bold">Blanklearn</span>
             </div>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-4 sm:mt-0">
@@ -651,7 +942,7 @@ const StickyBookingBar = ({ onBookDemoClick }: { onBookDemoClick: () => void }) 
                      <p className="text-sm text-slate-600">For Grade 4 this week</p>
                 </div>
                 <Button className="glowing-button flex-shrink-0" onClick={onBookDemoClick}>
-                    Book @ ₹1
+                    Book @ ₹10
                 </Button>
             </div>
         </div>
@@ -674,10 +965,12 @@ export default function HomePage() {
       <NavigationBar onBookDemoClick={handleBookDemoClick} />
       <main>
         <HeroHeader onBookDemoClick={handleBookDemoClick} />
+        
+<StudentHighlights />
         <PainAndSolution />
         <ProductFeatures />
         <DemoBreakdown />
-        <MeetTheMentors />
+ 
         <SocialProof />
         <PricingPlan />
         <FinalFAQ />
