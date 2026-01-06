@@ -98,7 +98,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
 
         const options = {
             key: "rzp_live_6vd9RApruseTAi", // Aapki Key
-            amount: "1000",
+            amount: "100",
             currency: "INR",
             name: "Blanklearn",
             description: "Demo Class Booking",
