@@ -40,10 +40,10 @@ export default function Policies() {
       <section className="mb-8">
         <h2 className="text-2xl font-bold mb-4">4. Refund & Cancellation Policy</h2>
         <p className="text-slate-600 mb-2">
-          <strong>Demo Class:</strong> The ₹10 fee is a nominal booking charge and is generally non-refundable.
+          <strong>Demo Class:</strong> The ₹49 fee is a nominal booking charge and is generally non-refundable.
         </p>
         <p className="text-slate-600">
-          <strong>Full Subscription:</strong> For our monthly plans (₹2000/₹4000), we offer a 7-day money-back guarantee. If you are not satisfied within the first 7 days, you may request a full refund by contacting us at the details provided above. Refunds are processed within 5-7 working days.
+          <strong>Full Subscription:</strong> For our monthly plans (₹999/₹2999), we offer a 2-day money-back guarantee. If you are not satisfied within the first 7 days, you may request a full refund by contacting us at the details provided above. Refunds are processed within 5-7 working days.
         </p>
       </section>
 
