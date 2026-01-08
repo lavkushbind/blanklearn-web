@@ -10,9 +10,9 @@ export default function FacebookPixel() {
     import("react-facebook-pixel")
       .then((x) => x.default)
       .then((ReactPixel) => {
-        // AAPKA REAL PIXEL ID (Jo screenshot mein tha)
-        ReactPixel.init("2260918854410275"); 
-        ReactPixel.pageView(); // Website khulte hi track karega
+        // NAYI ID LAGAYI HAI (Screenshot wali)
+        ReactPixel.init("25803660512655488"); 
+        ReactPixel.pageView();
       });
   }, [pathname]);
 
