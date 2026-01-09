@@ -10,8 +10,7 @@ export default function FacebookPixel() {
     import("react-facebook-pixel")
       .then((x) => x.default)
       .then((ReactPixel) => {
-        // NAYI ID LAGAYI HAI (Screenshot wali)
-        ReactPixel.init("25803660512655488"); 
+         ReactPixel.init("25803660512655488"); 
         ReactPixel.pageView();
       });
   }, [pathname]);
