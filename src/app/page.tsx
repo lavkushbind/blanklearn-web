@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// --- FINAL DEMO BOOKING MODAL (Pixel + Fixed Layout) ---
+// --- FINAL DEMO BOOKING MODAL (Updated for Single Plan) ---
 const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void; }) => {
     const { toast } = useToast();
     
@@ -50,11 +50,12 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [className, setClassName] = useState('');
-    const [selectedPlan, setSelectedPlan] = useState('999'); 
     const [selectedSlot, setSelectedSlot] = useState('');
 
     const [loading, setLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+
+    const PLAN_PRICE = '1499';
 
     // 1. SMART PIXEL TRACKING: Jab Modal Khule (InitiateCheckout)
     useEffect(() => {
@@ -69,7 +70,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
             setTimeout(() => {
                 setIsSuccess(false);
                 setName(''); setPhone(''); setClassName('');
-                setSelectedPlan('999'); setSelectedSlot('');
+                setSelectedSlot('');
             }, 300);
         }
     }, [open]);
@@ -94,7 +95,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                 studentName: name,
                 mobileNumber: phone,
                 studentClass: className,
-                interestedPlan: selectedPlan === '999' ? 'Small Group (999)' : 'Semi-Private (2999)',
+                interestedPlan: `Group of 5 (${PLAN_PRICE}/mo)`,
                 demoTime: selectedSlot,
                 status: "booked_free",
                 bookingDate: new Date().toLocaleString(),
@@ -106,7 +107,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                 ReactPixel.track('Lead', { 
                     value: 0, 
                     currency: 'INR',
-                    content_name: selectedPlan === '999' ? 'Small Group Lead' : 'Private Lead'
+                    content_name: 'Small Group Lead'
                 });
             });
 
@@ -123,17 +124,13 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
         }
     }
 
-    const planFeatures = selectedPlan === '999' ? [
+    // Updated Plan Features for ₹1499
+    const planFeatures = [
         "📚 1 Hr Live Class (Daily)",
         "📅 5 Days/Week (Mon-Fri)",
-        "👥 Max 8 Students Batch",
-        "🎥 Recording Access"
-    ] : [
-        "📚 1 Hr Live Class (Daily)",
-        "📅 6 Days/Week (Mon-Sat)",
-        "💎 Max 3 Students (VIP)",
-        "🤝 Weekly Parent Meeting",
-        "🎯 Personal Curriculum"
+        "👥 Max 5 Students Batch",
+        "🎥 Recording Access",
+        "✅ Homework Done in Class"
     ];
 
     return (
@@ -144,32 +141,18 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                         {/* HEADER */}
                         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 text-white text-center flex-shrink-0">
                             <DialogTitle className="text-2xl font-bold">Book Free Trial</DialogTitle>
-                            <DialogDescription className="text-blue-100 mt-1">Join 2000+ Happy Students today.</DialogDescription>
+                            <DialogDescription className="text-blue-100 mt-1">Join our interactive Small Group Class today.</DialogDescription>
                         </div>
                         
                         {/* SCROLLABLE CONTENT */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             
-                            {/* Plan Selection */}
+                            {/* Plan Display (Fixed) */}
                             <div className="space-y-2">
-                                <Label className="text-slate-900 font-semibold text-xs uppercase tracking-wider">SELECT INTEREST</Label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div 
-                                        onClick={() => setSelectedPlan('999')}
-                                        className={`cursor-pointer border-2 rounded-xl p-3 text-center transition-all relative ${selectedPlan === '999' ? 'border-blue-600 bg-blue-50/50 shadow-md' : 'border-slate-100 hover:border-slate-300'}`}
-                                    >
-                                        {selectedPlan === '999' && <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm">BEST VALUE</div>}
-                                        <p className="font-bold text-slate-900 text-sm">Small Group</p>
-                                        <p className="text-xs text-slate-500">₹999/mo</p>
-                                    </div>
-                                    <div 
-                                        onClick={() => setSelectedPlan('2999')}
-                                        className={`cursor-pointer border-2 rounded-xl p-3 text-center transition-all relative ${selectedPlan === '2999' ? 'border-blue-600 bg-blue-50/50 shadow-md' : 'border-slate-100 hover:border-slate-300'}`}
-                                    >
-                                        {selectedPlan === '2999' && <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">PREMIUM</div>}
-                                        <p className="font-bold text-slate-900 text-sm">Semi-Private</p>
-                                        <p className="text-xs text-slate-500">₹2,999/mo</p>
-                                    </div>
+                                <Label className="text-slate-900 font-semibold text-xs uppercase tracking-wider">YOUR INTERESTED PLAN</Label>
+                                <div className="border-2 border-blue-600 bg-blue-50/50 rounded-xl p-3 text-center shadow-md">
+                                    <p className="font-bold text-slate-900 text-lg">Small Group Class</p>
+                                    <p className="text-sm text-slate-500">₹{PLAN_PRICE}/Month</p>
                                 </div>
                                 
                                 {/* Dynamic Features */}
@@ -187,7 +170,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                              {/* Time Slot */}
                              <div className="space-y-2">
                                 <Label className="text-slate-900 font-semibold flex items-center gap-2 text-xs uppercase tracking-wider">
-                                    <Clock className="w-3 h-3 text-blue-600" /> TIME SLOT (TOMORROW)
+                                    <Clock className="w-3 h-3 text-blue-600" /> SELECT DEMO TIME (TOMORROW)
                                 </Label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {['4:00 PM - 5:00 PM', '6:00 PM - 7:00 PM', '7:00 PM - 8:00 PM', '8:00 PM - 9:00 PM'].map((slot) => (
@@ -225,12 +208,12 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                         </div>
                         <div>
                             <DialogTitle className="text-2xl font-extrabold text-slate-800">Booking Confirmed!</DialogTitle>
-                            <p className="text-slate-500 text-sm mt-1">Take a screenshot of your pass.</p>
+                            <p className="text-slate-500 text-sm mt-1">Your Demo Admit Pass is ready.</p>
                         </div>
                         <div className="bg-white border border-slate-200 p-0 rounded-2xl w-full text-left relative overflow-hidden shadow-xl">
                             <div className="bg-slate-900 text-white p-3 flex justify-between items-center">
-                                <span className="text-xs font-bold tracking-widest">BLANKLEARN PASS</span>
-                                <span className="bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded">ADMIT</span>
+                                <span className="text-xs font-bold tracking-widEST">BLANKLEARN PASS</span>
+                                <span className="bg-yellow-400 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">DEMO</span>
                             </div>
                             <div className="p-5 relative">
                                 <div className="absolute top-4 right-4 opacity-10"><QrCode className="w-16 h-16" /></div>
@@ -242,14 +225,14 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
                                 </div>
                             </div>
                             <div className="bg-blue-50 p-2 text-center border-t border-slate-100">
-                                <p className="text-xs text-blue-700 font-medium">Plan: {selectedPlan === '999' ? 'Small Group (₹999)' : 'Semi-Private (₹2999)'}</p>
+                                <p className="text-xs text-blue-700 font-medium">Plan: Small Group (₹{PLAN_PRICE}/mo)</p>
                             </div>
                         </div>
                         <div className="w-full space-y-3 pb-4">
                             <Button className="w-full h-12 bg-black hover:bg-slate-800 text-white gap-2 shadow-lg" onClick={() => window.open('https://play.google.com/store/apps/details?id=com.blank_learn.dark', '_blank')}>
                                 <PlayCircle className="fill-current w-5 h-5" /> Download App to Join
                             </Button>
-                            <p className="text-xs text-slate-400 font-medium bg-white px-3 py-1 rounded-full border border-slate-200 inline-block">🔔 Class link activates 10 mins before time</p>
+                            <p className="text-xs text-slate-400 font-medium bg-white px-3 py-1 rounded-full border border-slate-200 inline-block">🔔 Link active 10 mins before demo time</p>
                         </div>
                     </div>
                 )}
@@ -258,7 +241,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
     );
 };
 
-// --- REST OF THE SECTIONS ---
+// --- REST OF THE SECTIONS (Unchanged) ---
 
 const NavigationBar = ({ onBookDemoClick }: { onBookDemoClick: () => void; }) => (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-lg border-b border-slate-100">
@@ -286,7 +269,7 @@ const HeroHeader = ({ onBookDemoClick }: { onBookDemoClick: () => void }) => (
             Stop the Homework <span className="text-blue-600">Struggle.</span>
           </h1>
           <p className="mt-6 text-lg md:text-xl text-slate-600 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-            Live interactive classes that kids actually love. Homework help, concept clarity, and confidence building—starting at just <span className="font-bold text-slate-900">₹999/mo</span>.
+            Live interactive classes that kids actually love. Homework help, concept clarity, and confidence building—starting at just <span className="font-bold text-slate-900">₹1499/mo</span>.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
             <Button size="lg" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 h-14 px-8 text-lg font-bold shadow-xl shadow-blue-200" onClick={onBookDemoClick}>
@@ -370,7 +353,7 @@ const PainAndSolution = ({ onBookDemoClick }: { onBookDemoClick: () => void }) =
       <div className="grid md:grid-cols-3 gap-8">
         <Card className="bg-red-50/50 border-red-100 hover:shadow-lg transition-all"><CardHeader><div className="mx-auto bg-white rounded-full p-4 shadow-sm w-fit"><Clock className="w-8 h-8 text-red-500" /></div><CardTitle className="mt-4 text-xl text-center">The Struggle</CardTitle></CardHeader><CardContent><p className="text-center text-slate-600">Coming home tired to pending homework battles. It drains family time.</p></CardContent></Card>
         <Card className="bg-yellow-50/50 border-yellow-100 hover:shadow-lg transition-all"><CardHeader><div className="mx-auto bg-white rounded-full p-4 shadow-sm w-fit"><AlertTriangle className="w-8 h-8 text-yellow-500" /></div><CardTitle className="mt-4 text-xl text-center">The Crowd</CardTitle></CardHeader><CardContent><p className="text-center text-slate-600">Local tuitions pack 50+ kids. Your child is just a number lost in the crowd.</p></CardContent></Card>
-        <Card className="bg-blue-600 text-white shadow-xl shadow-blue-200 cursor-pointer hover:scale-105 transition-transform border-none" onClick={onBookDemoClick}><CardHeader><div className="mx-auto bg-white/20 rounded-full p-4 w-fit"><CheckCircle className="w-8 h-8 text-white" /></div><CardTitle className="mt-4 text-xl text-center">The Solution</CardTitle></CardHeader><CardContent><p className="text-center opacity-90">Small Batches (Max 8). Personal attention. Homework done in class.<br/><span className="font-bold underline mt-4 inline-block">Try Free Demo →</span></p></CardContent></Card>
+        <Card className="bg-blue-600 text-white shadow-xl shadow-blue-200 cursor-pointer hover:scale-105 transition-transform border-none" onClick={onBookDemoClick}><CardHeader><div className="mx-auto bg-white/20 rounded-full p-4 w-fit"><CheckCircle className="w-8 h-8 text-white" /></div><CardTitle className="mt-4 text-xl text-center">The Solution</CardTitle></CardHeader><CardContent><p className="text-center opacity-90">Small Batches (Max 5). Personal attention. Homework done in class.<br/><span className="font-bold underline mt-4 inline-block">Try Free Demo →</span></p></CardContent></Card>
       </div>
     </div>
   </section>
@@ -381,7 +364,7 @@ const ProductFeatures = ({ onBookDemoClick }: { onBookDemoClick: () => void }) =
       <div className="container mx-auto px-4">
         <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">More Than Just Tuition.</h2></div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {[{ icon: <Users className="w-8 h-8 text-blue-600" />, title: "Small Batches (1:8)", desc: "Every child speaks. Every child is heard. No backbenchers here." }, { icon: <FileText className="w-8 h-8 text-blue-600" />, title: "Homework Support", desc: "We finish school homework during class so your evenings are free." }, { icon: <Target className="w-8 h-8 text-blue-600" />, title: "Visual Learning", desc: "No rote memorization. We use 3D models & stories to explain concepts." }, { icon: <BarChart className="w-8 h-8 text-blue-600" />, title: "Progress Reports", desc: "Weekly WhatsApp updates on exactly how your child is improving." }].map((f, i) => (
+          {[{ icon: <Users className="w-8 h-8 text-blue-600" />, title: "Small Batches (1:5)", desc: "Every child speaks. Every child is heard. No backbenchers here." }, { icon: <FileText className="w-8 h-8 text-blue-600" />, title: "Homework Support", desc: "We finish school homework during class so your evenings are free." }, { icon: <Target className="w-8 h-8 text-blue-600" />, title: "Visual Learning", desc: "No rote memorization. We use 3D models & stories to explain concepts." }, { icon: <BarChart className="w-8 h-8 text-blue-600" />, title: "Progress Reports", desc: "Weekly WhatsApp updates on exactly how your child is improving." }].map((f, i) => (
             <div key={i} onClick={onBookDemoClick} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group">
               <div className="mb-6 bg-blue-50 w-fit p-3 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">{f.icon}</div>
               <h3 className="text-lg font-bold text-slate-900 mb-3">{f.title}</h3>
@@ -427,31 +410,18 @@ const PricingPlan = ({ onBookDemoClick }: { onBookDemoClick: () => void }) => (
     <section className="py-24 bg-slate-50 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
         <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">Simple, Affordable Pricing.</h2><p className="mt-4 text-slate-600">Quality education shouldn't be expensive.</p></div>
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden hover:scale-[1.02] transition-transform duration-300 relative">
-                    <div className="absolute top-0 left-0 w-full h-1.5 bg-blue-500"></div>
-                    <div className="p-8 text-center border-b border-slate-50">
-                        <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Most Popular</span>
-                        <h3 className="text-2xl font-bold text-slate-900 mt-4">Small Group</h3>
-                        <div className="flex justify-center items-baseline mt-4 gap-1"><span className="text-5xl font-extrabold text-slate-900">₹999</span><span className="text-slate-500">/mo</span></div>
-                        <p className="text-slate-500 text-sm mt-2">Max 8 Students • Daily Classes</p>
-                    </div>
-                    <div className="p-8 bg-slate-50/50">
-                        <ul className="space-y-4 mb-8">{['Live Classes (Mon-Fri)', 'Homework Help Included', 'Recording Access', 'Monthly PTM'].map((f, i)=><li key={i} className="flex gap-3 text-sm text-slate-700 font-medium"><CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0"/> {f}</li>)}</ul>
-                        <Button onClick={onBookDemoClick} className="w-full bg-slate-900 hover:bg-slate-800 h-12 text-lg">Choose Plan</Button>
-                    </div>
-                </div>
+            <div className="text-center mb-16"><h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">Simple, Affordable Pricing.</h2><p className="mt-4 text-slate-600">Quality education shouldn't be expensive. ₹1499/Month for 5 students group!</p></div>
+            <div className="grid md:grid-cols-1 gap-8 max-w-md mx-auto">
                 <div className="bg-white rounded-3xl shadow-xl border-2 border-blue-600 overflow-hidden hover:scale-[1.02] transition-transform duration-300 relative">
-                    <div className="bg-blue-600 text-white text-center py-2 text-xs font-bold uppercase tracking-widest">Premium Attention</div>
+                    <div className="bg-blue-600 text-white text-center py-2 text-xs font-bold uppercase tracking-widest">Standard Monthly Plan</div>
                     <div className="p-8 text-center border-b border-slate-50">
-                        <h3 className="text-2xl font-bold text-slate-900">Semi-Private</h3>
-                        <div className="flex justify-center items-baseline mt-4 gap-1"><span className="text-5xl font-extrabold text-slate-900">₹2,999</span><span className="text-slate-500">/mo</span></div>
-                        <p className="text-slate-500 text-sm mt-2">Max 3 Students • VIP Focus</p>
+                        <h3 className="text-2xl font-bold text-slate-900">Small Group (Max 5)</h3>
+                        <div className="flex justify-center items-baseline mt-4 gap-1"><span className="text-5xl font-extrabold text-slate-900">₹1,499</span><span className="text-slate-500">/mo</span></div>
+                        <p className="text-slate-500 text-sm mt-2">Billed Monthly. Cancel Anytime.</p>
                     </div>
                     <div className="p-8 bg-blue-50/30">
-                        <ul className="space-y-4 mb-8">{['Live Classes (Mon-Sat)', 'Dedicated Mentor', 'Personalized Curriculum', 'Weekly Parents Meeting'].map((f, i)=><li key={i} className="flex gap-3 text-sm text-slate-700 font-medium"><CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0"/> {f}</li>)}</ul>
-                        <Button onClick={onBookDemoClick} className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg shadow-lg shadow-blue-200">Choose Plan</Button>
+                        <ul className="space-y-4 mb-8">{['Live Classes (Mon-Fri)', '1 Hour Daily Sessions', 'Max 5 Students Batch', 'Recording Access', 'Homework Completion Support'].map((f, i)=><li key={i} className="flex gap-3 text-sm text-slate-700 font-medium"><CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0"/> {f}</li>)}</ul>
+                        <Button onClick={onBookDemoClick} className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg shadow-lg shadow-blue-200">Book Free Demo & Enroll</Button>
                     </div>
                 </div>
             </div>
@@ -464,7 +434,7 @@ const FinalFAQ = () => (
         <div className="container max-w-3xl mx-auto px-4">
             <div className="text-center mb-12"><h2 className="text-3xl font-extrabold text-slate-900">Common Questions</h2></div>
             <Accordion type="single" collapsible className="w-full space-y-4">
-                {[{q: "Is it Live or Recorded?", a: "100% Live & Interactive on our App."}, {q: "What if I miss a class?", a: "Recordings are available instantly on the App."}, {q: "Is there a Refund Policy?", a: "Yes! 7-Day Money Back Guarantee."}, {q: "Do I need a laptop?", a: "No, works perfectly on mobile."}].map((item, index) => (
+                {[{q: "Is it Live or Recorded?", a: "100% Live & Interactive on our App."}, {q: "What if I miss a class?", a: "Recordings are available instantly on the App."}, {q: "Is there a Refund Policy?", a: "Yes! 7-Day Money Back Guarantee."}, {q: "How is the class structure?", a: "Classes are held Monday to Friday, 1 hour long, for a maximum of 5 students."}].map((item, index) => (
                     <AccordionItem key={index} value={`item-${index}`} className="bg-slate-50 rounded-xl px-6 border-none data-[state=open]:bg-blue-50 transition-colors">
                         <AccordionTrigger className="font-semibold text-slate-900 text-lg py-4 hover:no-underline">{item.q}</AccordionTrigger>
                         <AccordionContent className="text-slate-600 pb-4 leading-relaxed">{item.a}</AccordionContent>
@@ -499,7 +469,7 @@ const StickyBookingBar = ({ onBookDemoClick }: { onBookDemoClick: () => void }) 
     return (
         <div className={cn("fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-40 transition-transform md:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]", isVisible ? 'translate-y-0' : 'translate-y-full')}>
             <div className="flex justify-between items-center">
-                <div><p className="font-bold text-slate-900 text-sm">🔥 Limited Seats</p><p className="text-xs text-green-600 font-medium">Free for today</p></div>
+                <div><p className="font-bold text-slate-900 text-sm">🔥 ₹1499 Plan</p><p className="text-xs text-green-600 font-medium">Book Free Demo</p></div>
                 <Button className="bg-blue-600 text-white font-bold" onClick={onBookDemoClick}>Book Now</Button>
             </div>
         </div>
@@ -527,4 +497,3 @@ export default function HomePage() {
     </div>
   );
 }
- 

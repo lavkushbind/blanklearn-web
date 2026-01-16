@@ -1,413 +1,247 @@
-"use client"; // <-- THIS MUST BE THE ABSOLUTE FIRST LINE
+'use client'; // MUST be the very first line
 
-import React, { useState, useMemo } from 'react';import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";  
-import { Clock, Video, Phone, BookOpen, Mail, Users, LogOut, Menu, Calendar, ListChecks, BarChart3 } from "lucide-react";
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { auth, realtimeDb } from "@/lib/firebase"; 
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Clock, Zap, Users, TrendingUp, CalendarCheck, Loader2, LogOut } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+import Image from 'next/image';
+import { cn } from '@/lib/utils'; // Assuming you have a utility function for class merging
 
-// --- Mock Data Interfaces (As defined above) ---
-interface Student {
-    id: number;
-    name: string;
-    phone: string;
-    attendance: number; // Percentage
-    lastActivity: string;
-}
+// --- Mock Data & Setup ---
 
-interface Batch {
-    id: number;
-    time: string;
-    class: string;
-    subject: string;
-    filled: number;
-    capacity: number;
-    students: Student[];
-}
-
-interface Teacher {
-    id: number;
-    name: string;
-    role: string;
-}
-
-// --- Mock Data (As defined above) ---
-const mockStudents: Student[] = [
-    { id: 101, name: "Aarav Singh", phone: "+91-9876543210", attendance: 95, lastActivity: "2 days ago" },
-    { id: 102, name: "Bhavna Patel", phone: "+91-9988776655", attendance: 88, lastActivity: "1 hour ago" },
-    { id: 103, name: "Chirag Verma", phone: "+91-9123456789", attendance: 100, lastActivity: "Today" },
-    { id: 104, name: "Divya Rao", phone: "+91-9001122334", attendance: 75, lastActivity: "Yesterday" },
-    { id: 105, name: "Eshan Kumar", phone: "+91-8877665544", attendance: 92, lastActivity: "3 hours ago" },
-];
-
-const mockBatches: Batch[] = [
-  {
-    id: 1,
-    time: "4:00 PM - 5:00 PM",
-    class: "Class 5",
-    subject: "Maths",
-    filled: 3,
-    capacity: 5,
-    students: mockStudents.slice(0, 3),
-  },
-  {
-    id: 2,
-    time: "5:30 PM - 6:30 PM",
-    class: "Class 8",
-    subject: "Science",
-    filled: 5,
-    capacity: 10,
-    students: mockStudents.slice(2, 7).filter((_, i) => i < 5),
-  },
-];
-
-const mockTeacher: Teacher = {
-    id: 1,
-    name: "Priya Sharma",
-    role: "Maths Expert",
-}
-
-
-// --- Sidebar Component ---
-const Sidebar: React.FC<{ teacher: Teacher }> = ({ teacher }) => {
-    const [activeItem, setActiveItem] = useState('Dashboard');
-
-    const navItems = [
-        { name: 'Dashboard', icon: BarChart3, key: 'Dashboard' },
-        { name: 'My Schedule', icon: Calendar, key: 'Schedule' },
-        { name: 'My Batches', icon: Users, key: 'Batches' },
-        { name: 'Study Material', icon: BookOpen, key: 'Material' },
-        { name: 'Messages', icon: Mail, key: 'Messages' },
-    ];
-
-    return (
-        <div className="fixed top-0 left-0 h-screen w-64 bg-slate-900 text-white flex flex-col justify-between p-4 shadow-2xl z-20">
-            <div>
-                <div className="flex items-center gap-2 p-4 mb-8">
-                    <div className="p-1 bg-blue-600 rounded-lg">
-                        <BookOpen className="w-6 h-6 text-white" />
-                    </div>
-                    <h2 className="text-xl font-extrabold tracking-wide text-white">Educator Pro</h2>
-                </div>
-
-                <nav className="space-y-1">
-                    {navItems.map((item) => (
-                        <div
-                            key={item.key}
-                            onClick={() => setActiveItem(item.key)}
-                            className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors ${
-                                activeItem === item.key
-                                    ? 'bg-blue-600 text-white font-semibold shadow-lg'
-                                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                            }`}
-                        >
-                            <item.icon className="w-5 h-5 mr-3" />
-                            {item.name}
-                        </div>
-                    ))}
-                </nav>
-            </div>
-
-            <div className="p-4 border-t border-slate-800">
-                <div className="flex items-center mb-3">
-                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-lg font-bold mr-3">
-                        {teacher.name[0]}
-                    </div>
-                    <div>
-                        <p className="font-semibold text-sm">{teacher.name}</p>
-                        <p className="text-xs text-slate-400">{teacher.role}</p>
-                    </div>
-                </div>
-                <div className="flex items-center p-2 rounded-lg text-red-400 hover:bg-slate-800 cursor-pointer transition-colors">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    <span className="text-sm font-medium">Logout</span>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- Student Detail Modal Component ---
-interface ProfileModalProps {
-    viewProfile: Student | null;
-    setViewProfile: (student: Student | null) => void;
-}
-
-const StudentProfileModal: React.FC<ProfileModalProps> = ({ viewProfile, setViewProfile }) => {
-    if (!viewProfile) return null;
-
-    return (
-        <Dialog open={!!viewProfile} onOpenChange={() => setViewProfile(null)}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle className='text-xl'>Student Profile: {viewProfile.name}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-6 py-4">
-                    <div className="flex items-center space-x-4">
-                        <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center text-4xl font-bold text-blue-600 ring-4 ring-blue-50">
-                            {viewProfile.name[0]}
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-900">{viewProfile.name}</h2>
-                            <p className="text-slate-500">Student ID: {viewProfile.id}</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 border-t pt-4">
-                        <div>
-                            <p className="text-sm text-slate-500 uppercase tracking-wider">Parent Contact</p>
-                            <p className="font-semibold text-lg flex items-center gap-2"><Phone className="w-4 h-4"/> {viewProfile.phone}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-500 uppercase tracking-wider">Last Seen</p>
-                            <p className="font-semibold text-lg">{viewProfile.lastActivity}</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <p className="text-sm text-slate-500 uppercase tracking-wider">Attendance Rate</p>
-                        <div className="flex items-center gap-3">
-                            <Progress value={viewProfile.attendance} className="flex-1 h-2" />
-                            <span className="text-base font-bold text-green-600 w-10 text-right">{viewProfile.attendance}%</span>
-                        </div>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setViewProfile(null)}>Close</Button>
-                    <Button className="bg-green-600 hover:bg-green-700 text-white">
-                        <Phone className="w-4 h-4 mr-2" /> Contact Parent
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
+// Define a structure for the schedule (used in the checkLiveStatus logic)
+const MOCK_SCHEDULE = {
+    classId: "BATCH-A-101", // The batch ID that is currently checked for live status
+    nextClassTime: (() => {
+        // Set class to be 5 minutes in the future for testing 'GO LIVE NOW'
+        const date = new Date();
+        date.setMinutes(date.getMinutes() + 5); 
+        return date;
+    })(),
+    joinWindowMinutes: 10 // Educators can join 10 minutes before class starts
 };
 
 
-// --- Main Dashboard Component ---
+const MOCK_EDUCATOR_DATA = {
+    name: "Ms. Priya Singh",
+    id: "EDC1001",
+    salaryRate: "₹350/hr",
+    batches: [
+        { id: "BATCH-A-101", name: "Grade 8 Science (Mon-Fri)", time: "6:00 PM IST", students: 7, scheduledTopic: "Chapter 3: Vectors" },
+        { id: "BATCH-B-202", name: "Grade 9 Maths (T/Th/Sat)", time: "7:30 PM IST", students: 5, scheduledTopic: "Quadratic Equations" },
+    ]
+};
 
-const TeacherDashboard: React.FC = () => {
-    const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
-    const [viewProfile, setViewProfile] = useState<Student | null>(null);
-    const [isLive, setIsLive] = useState(false); // State for starting a class
+// --- Utility Functions & Constants ---
+const glassCardClasses = "backdrop-blur-lg bg-white/5 border border-white/20 shadow-xl rounded-2xl transition-all duration-300 hover:shadow-3xl";
 
-    // Calculate summary statistics
-    const totalCapacity = useMemo(() => mockBatches.reduce((sum, b) => sum + b.capacity, 0), []);
-    const totalEnrolled = useMemo(() => mockBatches.reduce((sum, b) => sum + b.filled, 0), []);
-    const onlineStatus = true; // Simulated online status
+// --- Component 1: Batch Schedule Card ---
+const BatchCard = ({ batch, onGoLive }: { batch: typeof MOCK_EDUCATOR_DATA['batches'][0] & { isLiveWindow: boolean, timeStatus: string } , onGoLive: (id: string) => void }) => {
+    const { toast } = useToast();
 
-    const handleStartClass = (batch: Batch) => {
-        console.log(`Starting live class for ${batch.class} ${batch.subject}`);
-        // In a real app, this would trigger navigation or API call
-        setIsLive(true);
+    const handleGoLive = () => {
+        if (batch.isLiveWindow) {
+            toast({ title: "Starting Class", description: `Entering ${batch.name} Classroom.` });
+            // In a real app, this would navigate to the live classroom:
+            // router.push(`/educator/classroom/${batch.id}`);
+            console.log(`Redirecting Educator to Classroom: /classroom/${batch.id}`);
+        } else {
+            toast({ title: "Not Yet Time", description: `Class starts at ${batch.time}.`, variant: "default" });
+        }
     };
 
-    const handleBatchSelect = (batch: Batch) => {
-        setSelectedBatch(batch);
-        setViewProfile(null); // Close profile if a new batch is selected
-    }
-    
-    const handleViewProfile = (student: Student) => {
-        setSelectedBatch(null); // Ensure the sidebar list view is deselected
-        setViewProfile(student);
-    }
+    return (
+        <Card className={cn(glassCardClasses, "p-6 border-l-4 border-blue-400 flex flex-col")}>
+            <CardHeader className="p-0 mb-3">
+                <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                    <CalendarCheck className="w-5 h-5 text-blue-300" /> {batch.name}
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 flex-grow space-y-3 text-white">
+                <div className='text-sm space-y-1'>
+                    <p className={`flex items-center gap-2 text-lg font-extrabold ${batch.isLiveWindow ? 'text-red-400' : 'text-yellow-300'}`}>
+                        <Clock className='w-4 h-4'/> {batch.timeStatus}
+                    </p>
+                    <p className="flex items-center gap-2 text-blue-200"><Users className='w-4 h-4'/> Students: {batch.students}</p>
+                </div>
+                <p className='text-sm text-slate-300 border-t border-white/10 pt-3'>Topic Today: <span className='font-semibold'>{batch.scheduledTopic}</span></p>
+            </CardContent>
+            <div className="mt-4 pt-4 border-t border-white/10">
+                <Button 
+                    onClick={handleGoLive}
+                    disabled={!batch.isLiveWindow}
+                    className={cn("w-full h-11 text-lg font-bold transition-all", 
+                        batch.isLiveWindow 
+                            ? "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 animate-pulse" 
+                            : "bg-slate-700 text-slate-400 cursor-not-allowed"
+                    )}
+                >
+                    {batch.isLiveWindow ? (
+                        <span className='flex items-center gap-2'><Zap className="w-5 h-5" /> START CLASS</span>
+                    ) : (
+                        <span className='flex items-center gap-2'><Clock className="w-5 h-5" /> Wait for Class</span>
+                    )}
+                </Button>
+            </div>
+        </Card>
+    );
+};
+
+// --- Component 2: Educator Stats ---
+const EducatorStats = ({ educatorData }: { educatorData: typeof MOCK_EDUCATOR_DATA }) => (
+    <Card className={cn(glassCardClasses, "p-6 border-t-4 border-purple-400 col-span-1")}>
+        <CardHeader className="p-0 mb-4">
+            <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-purple-300" /> Performance
+            </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 space-y-3 text-white">
+            <div className="flex justify-between py-2 border-b border-white/10">
+                <span className="text-sm text-blue-200">Hourly Rate</span>
+                <span className="font-bold text-lg text-yellow-300">{educatorData.salaryRate}</span>
+            </div>
+            <div className="flex justify-between py-2 border-b border-white/10">
+                <span className="text-sm text-blue-200">Batches Managed</span>
+                <span className="font-bold text-lg text-white">{educatorData.batches.length}</span>
+            </div>
+            <div className="flex justify-between pt-2">
+                <span className="text-sm text-blue-200">Total Students</span>
+                <span className="font-bold text-lg text-white">{educatorData.batches.reduce((sum, b) => sum + b.students, 0)}</span>
+            </div>
+        </CardContent>
+    </Card>
+);
+
+
+// ===================================================
+// 3. MAIN EDUCATOR DASHBOARD (DEFAULT EXPORT)
+// ===================================================
+const EducatorDashboard = () => {
+    const [educatorData] = useState(MOCK_EDUCATOR_DATA);
+    // Initialize schedule state based on the mock data structure
+    const [scheduleData, setScheduleData] = useState({
+        classActive: false,
+        classId: MOCK_SCHEDULE.classId,
+        nextClassTime: MOCK_SCHEDULE.nextClassTime,
+        joinWindowMinutes: MOCK_SCHEDULE.joinWindowMinutes,
+    });
+
+    const router = useRouter();
+    const { toast } = useToast();
+
+    // Handler for Live Status Checking
+    const checkLiveStatus = useCallback(() => {
+        const now = new Date();
+        const nextClassTime = scheduleData.nextClassTime;
+        
+        const timeDiffMs = nextClassTime.getTime() - now.getTime();
+        const diffMinutes = timeDiffMs / (1000 * 60); // Difference in minutes
+
+        // Check if the current time is within the join window (e.g., 10 minutes before to 10 minutes after start)
+        // For simplicity here, we check if we are within the defined window *before* the start time.
+        const isWithinJoinWindow = diffMinutes >= -scheduleData.joinWindowMinutes && diffMinutes <= 0;
+        
+        setScheduleData(prev => ({ 
+            ...prev, 
+            classActive: isWithinJoinWindow,
+            // If class is active, update the time status display dynamically if needed,
+            // but for this component, setting classActive is enough to change the button.
+        }));
+    }, [scheduleData.nextClassTime, scheduleData.joinWindowMinutes]);
+
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user) {
+            // Redirect only if running on the client side (which it is, due to 'use client')
+            router.push('/educator/login');
+            return;
+        }
+
+        // Initial check and continuous check every 10 seconds
+        checkLiveStatus(); 
+        const interval = setInterval(checkLiveStatus, 10000); 
+
+        return () => clearInterval(interval);
+    }, [router, checkLiveStatus]);
+
+    const handleLogout = async () => {
+        try {
+            await auth.signOut();
+            router.push('/educator/login');
+            toast({ title: "Logged Out", description: "You have been securely signed out." });
+        } catch (error) {
+            console.error("Logout error:", error);
+            toast({ title: "Error", description: "Could not log out.", variant: "destructive" });
+        }
+    };
+
 
     return (
-        <div className="min-h-screen bg-slate-50 flex">
-            {/* 1. Sidebar */}
-            <Sidebar teacher={mockTeacher} />
+        <div className="min-h-screen p-4 md:p-8 font-sans relative">
+            {/* Background Styling - Professional Dark Theme */}
+            <div className="fixed inset-0 bg-slate-950 -z-20"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950/95 to-indigo-950/90 -z-10 opacity-95"></div>
+            <div className="absolute inset-0 bg-slate-900/50 backdrop-filter backdrop-blur-sm"></div>
 
-            {/* 2. Main Content Area */}
-            <main className="flex-1 ml-64 p-8">
-                {/* Header and Status */}
-                <header className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-                            Teacher Dashboard
-                        </h1>
-                        <p className="text-slate-500 text-base">Welcome back, {mockTeacher.name}. Manage your sessions today.</p>
+            <div className="container mx-auto max-w-7xl relative z-10">
+                
+                {/* Header */}
+                <header className="flex justify-between items-center mb-10 pt-4">
+                    <div className="flex items-center gap-3">
+                        {/* NOTE: Ensure /logo.jpg exists or replace with a correct path */}
+                        <Image src="/logo.jpg" alt="Logo" width={40} height={40} className="rounded-lg shadow-lg border-2 border-white/50" />
+                        <h1 className="text-3xl font-extrabold text-white tracking-tight hidden sm:block">Educator Hub</h1>
                     </div>
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors ${
-                        onlineStatus ? 'bg-green-100 border-green-200' : 'bg-amber-100 border-amber-200'
-                    }`}>
-                        <span className={`w-3 h-3 rounded-full ${onlineStatus ? 'bg-green-600 animate-pulse' : 'bg-amber-600'}`}></span>
-                        <span className={`text-sm font-bold uppercase ${onlineStatus ? 'text-green-700' : 'text-amber-700'}`}>
-                            {onlineStatus ? 'Online' : 'Offline'}
-                        </span>
+                    <div className="flex items-center gap-4">
+                        <div className="text-right hidden sm:block">
+                            <p className="text-lg font-bold text-white">{educatorData.name}</p>
+                            <p className="text-sm text-green-300">Educator ID: {educatorData.id}</p>
+                        </div>
+                        <Button variant="outline" onClick={handleLogout} className='bg-white/10 text-white border-white/30 hover:bg-white/20'>
+                            <LogOut className='w-4 h-4 mr-2'/> Logout
+                        </Button>
                     </div>
                 </header>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-4 gap-6 mb-8">
-                    <Card className="shadow-lg border-l-4 border-l-blue-500">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-500">Today's Sessions</CardTitle>
-                            <Calendar className="h-4 w-4 text-blue-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{mockBatches.length} Classes</div>
-                            <p className="text-xs text-slate-400 mt-1">Scheduled for today</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="shadow-lg border-l-4 border-l-green-500">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-500">Total Students</CardTitle>
-                            <Users className="h-4 w-4 text-green-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{totalEnrolled} / {totalCapacity}</div>
-                            <p className="text-xs text-slate-400 mt-1">Across all active batches</p>
-                        </CardContent>
-                    </Card>
-
-                     <Card className="shadow-lg border-l-4 border-l-amber-500">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-500">Study Material</CardTitle>
-                            <BookOpen className="h-4 w-4 text-amber-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">12 Resources</div>
-                            <p className="text-xs text-slate-400 mt-1">Uploaded this week</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="shadow-lg border-l-4 border-l-red-500">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-slate-500">Pending Reports</CardTitle>
-                            <ListChecks className="h-4 w-4 text-red-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">2 Urgent</div>
-                            <p className="text-xs text-slate-400 mt-1">Submit feedback by EOD</p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <main className="space-y-8">
                     
-                    {/* Left Column: Upcoming Sessions */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <h2 className="text-xl font-semibold text-slate-800">Today's Live Sessions</h2>
+                    <h2 className="text-2xl font-bold text-white mb-6 border-b border-white/10 pb-2">Today's Schedule</h2>
+
+                    {/* BATCHES ROW */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         
-                        {mockBatches.length > 0 ? (
-                            mockBatches.map((batch) => (
-                                <Card key={batch.id} className="border-l-4 border-l-blue-600 shadow-lg hover:shadow-xl transition-shadow">
-                                    <CardContent className="p-6">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <Badge variant="secondary" className="mb-2 text-xs bg-blue-100 text-blue-700 border-blue-300">
-                                                    <Clock className="w-3 h-3 mr-1"/> {batch.time}
-                                                </Badge>
-                                                <h3 className="text-xl font-bold text-slate-900">{batch.class} • {batch.subject}</h3>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-3xl font-black text-blue-600">{batch.filled}/{batch.capacity}</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Students Attended</p>
-                                            </div>
-                                        </div>
-                                        <div className="mt-6 flex gap-3 border-t pt-4">
-                                            <Button 
-                                                onClick={() => handleStartClass(batch)} 
-                                                className="flex-1 bg-blue-600 hover:bg-blue-700 font-bold"
-                                                disabled={batch.filled === 0} // Disable if no students are currently enrolled/present
-                                            >
-                                                <Video className="w-4 h-4 mr-2" /> Start Live Class
-                                            </Button>
-                                            <Button 
-                                                variant="outline" 
-                                                onClick={() => handleBatchSelect(batch)} 
-                                                className={`border-slate-300 ${selectedBatch?.id === batch.id ? 'bg-slate-100' : ''}`}
-                                            >
-                                                Details & Roster
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))
-                        ) : (
-                            <Card className="p-8 text-center border-dashed border-slate-300 bg-white">
-                                <Calendar className="w-8 h-8 mx-auto mb-3 text-slate-400" />
-                                <p className="text-slate-600 font-semibold">No sessions scheduled for today.</p>
-                                <p className="text-sm text-slate-400 mt-1">Check your schedule for future classes.</p>
-                            </Card>
-                        )}
+                        {educatorData.batches.map((batch) => (
+                            <BatchCard 
+                                key={batch.id} 
+                                batch={{ 
+                                    ...batch, 
+                                    // Logic to determine if this specific batch is the one currently 'live'
+                                    isLiveWindow: scheduleData.classActive && batch.id === scheduleData.classId,
+                                    timeStatus: (scheduleData.classActive && batch.id === scheduleData.classId) 
+                                                ? "LIVE NOW" 
+                                                : batch.time
+                                }} 
+                                onGoLive={() => { /* Handled internally */ }}
+                            />
+                        ))}
+
+                        {/* Educator Stats Card */}
+                        <EducatorStats educatorData={educatorData} />
                     </div>
-
-                    {/* Right Column: Student Roster / Batch Details */}
-                    <div className="space-y-6">
-                        <h2 className="text-xl font-semibold text-slate-800">Student Roster</h2>
-                        {selectedBatch ? (
-                            <Card className="bg-white shadow-lg">
-                                <CardHeader className="bg-slate-50 p-4 border-b rounded-t-xl">
-                                    <CardTitle className="text-lg">
-                                        {selectedBatch.class} ({selectedBatch.subject})
-                                    </CardTitle>
-                                    <p className="text-sm text-slate-500">{selectedBatch.filled} Students Enrolled</p>
-                                </CardHeader>
-                                <CardContent className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
-                                    {selectedBatch.students.map((stu) => (
-                                        <div key={stu.id} className="flex justify-between items-center p-3 rounded-lg border border-slate-100 bg-white hover:bg-blue-50 transition-colors">
-                                            <span className="font-semibold text-sm text-slate-800">{stu.name}</span>
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700">{stu.attendance}%</Badge>
-                                                <Button size="sm" variant="ghost" onClick={() => handleViewProfile(stu)} title="View Profile">
-                                                    <Phone className="w-4 h-4 text-blue-600"/>
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <div className="p-10 border-2 border-dashed border-blue-200 rounded-xl text-center text-slate-500 bg-white h-[calc(100vh-350px)] flex flex-col justify-center items-center">
-                                <Users className="w-10 h-10 mb-3 text-blue-400" />
-                                <p className="font-semibold">Select a batch from the left</p>
-                                <p className="text-sm mt-1">To view the student roster and performance details.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </main>
-
-            {/* Live Class Modal Placeholder */}
-            <Dialog open={isLive} onOpenChange={setIsLive}>
-                <DialogContent className="sm:max-w-4xl bg-gray-900 text-white border-none">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl text-white">LIVE CLASS IN PROGRESS</DialogTitle>
-                    </DialogHeader>
-                    <div className="aspect-video bg-black rounded-lg flex items-center justify-center text-xl">
-                        [Live Video Feed Placeholder: Class in Session]
-                    </div>
-                    <DialogFooter>
-                        <Button variant="destructive" onClick={() => setIsLive(false)}>End Class</Button>
-                        <Button>Mute All</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-
-            {/* Student Profile Modal is rendered separately */}
-            <StudentProfileModal 
-                viewProfile={viewProfile} 
-                setViewProfile={handleViewProfile} 
-            />
+                    
+                </main>
+                
+                <footer className='pt-12 text-center text-sm text-slate-400'>
+                    &copy; 2026 Blanklearn Educator Portal.
+                </footer>
+            </div>
         </div>
     );
-};
+}
 
-export default TeacherDashboard;
+// Ensure this is the final default export that Next.js expects for the route segment.
+export default EducatorDashboard;

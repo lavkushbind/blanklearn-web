@@ -1,283 +1,161 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ref, set } from "firebase/database";
+import { realtimeDb } from "@/lib/firebase"; 
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, CheckCircle, ArrowLeft, Briefcase, GraduationCap, DollarSign, Users, Mail } from 'lucide-react'; // <-- ADDED Users and Mail
+import Image from 'next/image';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+const EducatorApplicationPage = () => {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [subject, setSubject] = useState('');
+    const [experience, setExperience] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+    const router = useRouter();
+    const { toast } = useToast();
 
-import {
-  DollarSign,
-  Laptop,
-  Users,
-  Award,
-  Upload,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle,
-} from "lucide-react";
+    const handleApplicationSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!name || !email || !phone || !subject || !experience) {
+            toast({ title: "Missing Information", description: "Please fill in all required fields.", variant: "destructive" });
+            return;
+        }
+        if (phone.length < 10) {
+            toast({ title: "Invalid Phone", description: "Please enter a valid 10-digit mobile number.", variant: "destructive" });
+            return;
+        }
 
-import { auth, realtimeDb } from "@/lib/firebase";
-import { ref, update, get } from "firebase/database";
+        setLoading(true);
+        // const sanitizedPhone = phone.replace(/\D/g, ''); // Not needed if phone is already sliced to 10 digits
+        const applicationId = `APPL-${Date.now()}`;
 
-export default function VerifyEducator() {
-  const router = useRouter();
-  const fileRef = useRef<HTMLInputElement | null>(null);
+        try {
+            const applicationRef = ref(realtimeDb, `NewTeacherApplications/${applicationId}`);
+            
+            await set(applicationRef, {
+                id: applicationId,
+                fullName: name,
+                mobileNumber: phone,
+                email: email,
+                primarySubject: subject,
+                yearsOfExperience: experience,
+                status: "pending_review",
+                applicationDate: new Date().toLocaleString(),
+            });
 
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+            toast({ title: "Application Sent!", description: "Thank you for applying. We will review your details shortly." });
+            setLoading(false);
+            setIsSubmitted(true);
 
-  const [resume, setResume] = useState<File | null>(null);
-
-  const [formData, setFormData] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    bio: "",
-    qualification: "",
-    experience: "",
-    subjects: "",
-    hasLaptop: false,
-    hasBroadband: false,
-    hasPenTablet: false,
-    demoLink: "",
-  });
-
-  // 🔒 Only logged-in educators can access this page
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      router.replace("/login");
-      return;
+        } catch (error) {
+            console.error("Error submitting application:", error);
+            setLoading(false);
+            toast({ title: 'Submission Error', description: 'Could not submit application. Try again later.', variant: 'destructive' });
+        }
     }
 
-    get(ref(realtimeDb, `teachers/${user.uid}`)).then((snap) => {
-      const data = snap.val();
-
-      // If already verified → dashboard
-      if (data?.isVerified) {
-        router.replace("/educator/sessions");
-        return;
-      }
-
-      // Prefill data
-      setFormData((prev) => ({
-        ...prev,
-        fullName: data?.name || "",
-        email: data?.email || "",
-        phone: data?.phone || "",
-      }));
-
-      setLoading(false);
-    });
-  }, []);
-
-  const handleChange = (key: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const submitProfile = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    if (!resume || !formData.demoLink || !formData.qualification) {
-      alert("Please upload resume, demo link and qualification");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      await update(ref(realtimeDb, `teachers/${user.uid}`), {
-        ...formData,
-        profileCompleted: true,
-        isVerified: false,
-        verificationStatus: "pending",
-        submittedAt: Date.now(),
-      });
-
-      alert("Profile submitted. Our team will verify you within 24 hours.");
-      router.replace("/educator/waiting");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to submit profile");
-    }
-
-    setSaving(false);
-  };
-
-  if (loading) {
-    return <div className="h-screen flex justify-center items-center">Loading…</div>;
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
-      {/* LEFT */}
-      <div className="md:w-1/3 bg-slate-900 text-white p-10">
-        <h2 className="text-3xl font-bold mb-6">Why Teach With Us?</h2>
-
-        <div className="space-y-6">
-          <div className="flex gap-4">
-            <DollarSign className="text-blue-400" />
-            <p>Earn up to ₹50,000/month</p>
-          </div>
-
-          <div className="flex gap-4">
-            <Laptop className="text-blue-400" />
-            <p>Work from home</p>
-          </div>
-
-          <div className="flex gap-4">
-            <Users className="text-blue-400" />
-            <p>Small batches (5–8 students)</p>
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT */}
-      <div className="md:w-2/3 p-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>Complete Your Profile</CardTitle>
-            <p className="text-sm text-slate-500">Step {step} of 3</p>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            {/* STEP 1 */}
-            {step === 1 && (
-              <>
-                <Input
-                  placeholder="Full Name"
-                  value={formData.fullName}
-                  onChange={(e) => handleChange("fullName", e.target.value)}
+    const FormContent = (
+        <form onSubmit={handleApplicationSubmit} className="space-y-5">
+            
+            {/* Personal Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input 
+                    placeholder="Your Full Name" 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)} 
+                    disabled={loading}
+                    icon={<Users className='w-4 h-4' />}
                 />
-                <Input
-                  placeholder="Phone"
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
+                <Input 
+                    type="tel"
+                    placeholder="Mobile Number (10 Digits)" 
+                    value={phone} 
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                    disabled={loading}
+                    icon={<DollarSign className='w-4 h-4' />} 
                 />
-                <Input
-                  placeholder="Email"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                />
-                <Textarea
-                  placeholder="Short bio"
-                  value={formData.bio}
-                  onChange={(e) => handleChange("bio", e.target.value)}
-                />
-              </>
-            )}
-
-            {/* STEP 2 */}
-            {step === 2 && (
-              <>
-                <Input
-                  placeholder="Qualification"
-                  value={formData.qualification}
-                  onChange={(e) => handleChange("qualification", e.target.value)}
-                />
-                <Input
-                  placeholder="Experience (years)"
-                  type="number"
-                  value={formData.experience}
-                  onChange={(e) => handleChange("experience", e.target.value)}
-                />
-                <Input
-                  placeholder="Subjects"
-                  value={formData.subjects}
-                  onChange={(e) => handleChange("subjects", e.target.value)}
-                />
-
-                <div className="space-y-2">
-                  <label className="flex gap-2">
-                    <Checkbox
-                      checked={formData.hasLaptop}
-                      onCheckedChange={(v) => handleChange("hasLaptop", v)}
-                    />
-                    Laptop/PC
-                  </label>
-                  <label className="flex gap-2">
-                    <Checkbox
-                      checked={formData.hasBroadband}
-                      onCheckedChange={(v) => handleChange("hasBroadband", v)}
-                    />
-                    Broadband
-                  </label>
-                  <label className="flex gap-2">
-                    <Checkbox
-                      checked={formData.hasPenTablet}
-                      onCheckedChange={(v) => handleChange("hasPenTablet", v)}
-                    />
-                    Pen Tablet
-                  </label>
-                </div>
-              </>
-            )}
-
-            {/* STEP 3 */}
-            {step === 3 && (
-              <>
-                <Input
-                  placeholder="Demo Video Link"
-                  value={formData.demoLink}
-                  onChange={(e) => handleChange("demoLink", e.target.value)}
-                />
-
-                <div
-                  className="border-dashed border p-6 rounded text-center cursor-pointer"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  <Upload className="mx-auto mb-2" />
-                  Click to upload resume
-                  <input
-                    type="file"
-                    ref={fileRef}
-                    className="hidden"
-                    onChange={(e) => setResume(e.target.files?.[0] || null)}
-                  />
-                </div>
-
-                {resume && (
-                  <p className="text-green-600 flex gap-2">
-                    <CheckCircle /> {resume.name}
-                  </p>
-                )}
-              </>
-            )}
-
-            <div className="flex justify-between pt-4">
-              <Button
-                variant="outline"
-                disabled={step === 1}
-                onClick={() => setStep((s) => s - 1)}
-              >
-                <ArrowLeft /> Back
-              </Button>
-
-              {step < 3 ? (
-                <Button onClick={() => setStep((s) => s + 1)}>
-                  Next <ArrowRight />
-                </Button>
-              ) : (
-                <Button onClick={submitProfile} disabled={saving}>
-                  {saving ? "Submitting…" : "Submit"}
-                </Button>
-              )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+            
+            <Input 
+                type="email"
+                placeholder="Professional Email Address" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                disabled={loading}
+                icon={<Mail className='w-4 h-4' />} // Added Mail icon for completeness
+            />
+            
+            {/* Qualification Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input 
+                    placeholder="Subject Expertise (e.g., Maths, Physics)" 
+                    value={subject} 
+                    onChange={(e) => setSubject(e.target.value)} 
+                    disabled={loading}
+                    icon={<GraduationCap className='w-4 h-4' />}
+                />
+                 <Input 
+                    placeholder="Years of Experience (e.g., 5+ years)" 
+                    value={experience} 
+                    onChange={(e) => setExperience(e.target.value)} 
+                    disabled={loading}
+                    icon={<Briefcase className='w-4 h-4' />}
+                />
+            </div>
+
+            <Button 
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold shadow-lg shadow-blue-200/50 mt-6"
+            >
+                {loading ? <span className='flex items-center gap-2'><Loader2 className="animate-spin w-4 h-4" /> Submitting Credentials...</span> : 'Submit Application'}
+            </Button>
+        </form>
+    );
+
+    const SuccessContent = (
+        <div className="flex flex-col items-center justify-center text-center p-8 space-y-6">
+            <CheckCircle className="w-16 h-16 text-green-500 mb-2" />
+            <h3 className="text-2xl font-extrabold text-slate-900">Application Received!</h3>
+            <p className="text-slate-600">Thank you, {name}. Your application has been successfully submitted for review. The Admin team will contact you on your provided mobile number once verified.</p>
+            <Button onClick={() => router.push('/')} className="mt-4 bg-blue-600 hover:bg-blue-700">
+                Go to Homepage
+            </Button>
+        </div>
+    );
+
+    return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans relative">
+            
+            <Link href="/" className="absolute top-6 left-6 flex items-center text-sm text-slate-600 hover:text-blue-600 transition-colors z-10">
+                <ArrowLeft className="w-4 h-4 mr-1" /> Back to Home
+            </Link>
+
+            <Card className="w-full max-w-2xl shadow-2xl border-t-4 border-blue-600 bg-white animate-in fade-in duration-500">
+                <CardHeader className="text-center pt-8 pb-6 border-b border-slate-100">
+                    <div className="flex justify-center mb-3">
+                        <Image src="/logo.jpg" alt="Logo" width={48} height={48} className="rounded-lg shadow-md" />
+                    </div>
+                    <CardTitle className="text-3xl font-bold text-slate-900">Become an Educator</CardTitle>
+                    <p className="text-md text-slate-500 mt-1">Fill out the form to join our expert team.</p>
+                </CardHeader>
+                
+                <CardContent className="p-8">
+                    {!isSubmitted ? FormContent : SuccessContent}
+                </CardContent>
+            </Card>
+        </div>
+    );
 }
+
+export default EducatorApplicationPage;

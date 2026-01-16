@@ -1,8 +1,8 @@
+// src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, RecaptchaVerifier } from "firebase/auth";
 import { getDatabase } from "firebase/database";
-import { getAuth } from "firebase/auth";
 
-// 🔹 Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDkAbUlYv7SeA08-JFxFbkHaF_tlpbRIMw",
   authDomain: "dark-6191f.firebaseapp.com",
@@ -13,13 +13,17 @@ const firebaseConfig = {
   appId: "1:730022278030:web:e5a2754692f94dc073aadf",
 };
 
-// 🔹 Prevent multiple Firebase initialization (Next.js safe)
+// App Initialize logic: Prevents re-initialization on every request/reload
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// 🔹 Single source of truth
+// Auth Export
 export const auth = getAuth(app);
-auth.useDeviceLanguage(); // Ye line add kar dein (Language fix ke liye)
+auth.useDeviceLanguage();
 
+// Database Export 
 export const realtimeDb = getDatabase(app);
 
-export default app;
+// Export RecaptchaVerifier explicitly, as it relies on browser APIs
+export { RecaptchaVerifier }; 
+
+// IMPORTANT: Removed 'export default app;' to prevent SSR build errors in other modules.
