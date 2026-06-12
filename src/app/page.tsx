@@ -57,7 +57,7 @@ const DemoBookingModal = ({ open, onOpenChange }: { open: boolean; onOpenChange:
     const [loading, setLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 
-    const PLAN_PRICE = '1499';
+    const PLAN_PRICE = '2499';
 
     // 1. SMART PIXEL TRACKING: Jab Modal Khule (InitiateCheckout)
     useEffect(() => {
