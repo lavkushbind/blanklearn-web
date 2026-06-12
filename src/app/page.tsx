@@ -838,10 +838,7 @@ const Footer = ({ onBookDemoClick }: { onBookDemoClick: () => void }) => (
 
                 {/* Quick Links */}
                 <div className="flex flex-wrap gap-8 text-sm">
-                    <a href="/about" className="hover:text-white transition-colors">About Us</a>
-                    <a href="/how-it-works" className="hover:text-white transition-colors">How It Works</a>
-                    <a href="/pricing" className="hover:text-white transition-colors">Pricing</a>
-                    <a href="/contact" className="hover:text-white transition-colors">Contact</a>
+                     
                     <a href="/policies" className="hover:text-white transition-colors">Privacy Policy</a>
                     <a href="/policies" className="hover:text-white transition-colors">Terms of Service</a>
                 </div>
